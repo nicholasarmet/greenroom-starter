@@ -40,11 +40,13 @@ export default async function ReviewSettlementPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
-  searchParams: { token?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ token?: string }>;
 }) {
-  const tokenPayload = parseReviewToken(searchParams.token);
-  if (!tokenPayload || tokenPayload.showId !== params.id) {
+  const { id } = await params;
+  const { token } = await searchParams;
+  const tokenPayload = parseReviewToken(token);
+  if (!tokenPayload || tokenPayload.showId !== id) {
     return (
       <div className="px-12 py-10 max-w-4xl">
         <Card>
@@ -58,7 +60,7 @@ export default async function ReviewSettlementPage({
     );
   }
 
-  const showData = await getShowById(params.id);
+  const showData = await getShowById(id);
   if (!showData) notFound();
 
   const { show, artist, deal, ticketSales, expenses, settlement, recoups, venue } = showData;
@@ -123,7 +125,7 @@ export default async function ReviewSettlementPage({
         </div>
 
         <div className="space-y-6">
-          <SettlementReviewActions showId={params.id} token={searchParams.token ?? ""} />
+          <SettlementReviewActions showId={id} token={token ?? ""} />
 
           <Card className="border-ink-200/80 bg-slate-50">
             <CardContent>

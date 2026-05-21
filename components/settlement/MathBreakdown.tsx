@@ -57,10 +57,14 @@ export function MathBreakdown({
                 return (
                   <div className="space-y-3">
                     {calc.steps.map((step, index) => {
-                      running += step.value;
                       const meta = step.meta as Record<string, unknown> | undefined;
                       const isWinner = meta && (meta as any).winner === true;
                       const isVsChoice = meta && (meta as any).type === "vs-choice";
+                      if (isVsChoice) {
+                        running = step.value;
+                      } else {
+                        running += step.value;
+                      }
 
                       return (
                         <div
@@ -82,9 +86,6 @@ export function MathBreakdown({
                               </div>
                               {step.note ? (
                                 <div className="text-[12px] text-ink-500 mt-1">{step.note}</div>
-                              ) : null}
-                              {meta ? (
-                                <div className="text-[11px] text-ink-500 mt-2">Meta: {JSON.stringify(meta)}</div>
                               ) : null}
                             </div>
 

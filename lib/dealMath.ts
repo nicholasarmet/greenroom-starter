@@ -336,7 +336,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         },
         {
           label: "Choose greater of guarantee and % of net",
-          value: 0,
+          value: winnerValue,
           note: `${winnerLabel} wins`,
           meta: { type: "vs-choice", winnerIndex: winnerIsGuarantee ? 1 : 0 },
         },

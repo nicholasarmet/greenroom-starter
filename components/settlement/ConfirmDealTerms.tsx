@@ -111,8 +111,15 @@ function formatValue(value: unknown) {
 }
 
 function formatTermValue(key: keyof ExtractedDealTerms, value: unknown) {
+  if (value == null) return "—";
+  if (
+    key === "guaranteeAmount" ||
+    key === "expenseCap" ||
+    key === "hospitalityCap"
+  ) {
+    return formatMoney(Number(value));
+  }
   if (key === "percentage") {
-    if (value == null) return "—";
     return `${Number(value) * 100}%`;
   }
   return formatValue(value);
