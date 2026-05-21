@@ -1,5 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/format";
+import {
+  formatEnteredBy,
+  formatExpenseCategory,
+  formatRecoupCategory,
+  formatRecoupStatus,
+} from "@/lib/displayLabels";
 import type { Expense, Recoup } from "@/db/schema";
 import type { SettlementCalculation } from "@/lib/dealMath";
 
@@ -196,7 +202,7 @@ export function MathBreakdown(
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[13px] font-semibold text-ink-900">
-                        {expense.category.replace(/_/g, " ")}
+                        {formatExpenseCategory(expense.category)}
                       </div>
                       <div className="text-[12px] text-ink-500">
                         {expense.description || "No description provided."}
@@ -207,7 +213,7 @@ export function MathBreakdown(
                     </div>
                   </div>
                   <div className="text-[12px] text-ink-500">
-                    Source: {expense.enteredByUserId ? `entered by ${expense.enteredByUserId}` : "system"}
+                    Source: {formatEnteredBy(expense.enteredByUserId)}
                   </div>
                 </div>
               ))}
@@ -235,10 +241,10 @@ export function MathBreakdown(
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[13px] font-semibold text-ink-900">
-                        {recoup.label} ({recoup.category.replace(/_/g, " ")})
+                        {recoup.label}
                       </div>
                       <div className="text-[12px] text-ink-500 mt-1">
-                        Status: {recoup.status}
+                        {formatRecoupCategory(recoup.category)} · {formatRecoupStatus(recoup.status)}
                       </div>
                     </div>
                     <div className="text-[14px] font-medium text-ink-900">

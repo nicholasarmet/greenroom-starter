@@ -3,6 +3,11 @@ import { AlertTriangle, ArrowRight } from "lucide-react";
 import { getReports } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/lib/format";
+import {
+  formatCompCategory,
+  formatDealType,
+  formatSettlementLifecycleStage,
+} from "@/lib/displayLabels";
 
 export default async function ReportsPage() {
   const r = await getReports();
@@ -170,7 +175,7 @@ export default async function ReportsPage() {
               <div key={stage} className="flex items-center gap-3 group">
                 <div className="w-20 text-right">
                   <span className="text-[12px] font-medium text-ink-600 capitalize">
-                    {stage.replace(/_/g, " ")}
+                    {formatSettlementLifecycleStage(stage)}
                   </span>
                 </div>
                 <div className="flex-1 flex items-center gap-2">
@@ -283,20 +288,11 @@ export default async function ReportsPage() {
                     ...Object.values(r.compsByCategory),
                   );
                   const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                  const labels: Record<string, string> = {
-                    artist_gl: "Artist guest list",
-                    label: "Label / management",
-                    press: "Press",
-                    venue_staff: "Venue staff",
-                    sponsor: "Sponsor",
-                    promo: "Promo / radio",
-                    other: "Other",
-                  };
                   return (
                     <div key={cat} className="flex items-center gap-3">
                       <div className="w-32 text-right">
                         <span className="text-[12px] text-ink-600">
-                          {labels[cat] ?? cat}
+                          {formatCompCategory(cat)}
                         </span>
                       </div>
                       <div className="flex-1 flex items-center gap-2">
@@ -336,18 +332,11 @@ export default async function ReportsPage() {
                   type === "flat" || type === "percentage_of_gross";
                 const maxCount = Math.max(...dealMix.map((d) => d.count));
                 const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                const friendly: Record<string, string> = {
-                  flat: "Flat",
-                  percentage_of_gross: "% of gross",
-                  percentage_of_net: "% of net",
-                  vs: "Vs deal",
-                  door: "Door deal",
-                };
                 return (
                   <div key={type} className="flex items-center gap-3">
                     <div className="w-24 text-right flex items-center justify-end gap-1.5">
                       <span className="text-[12px] font-medium text-ink-900">
-                        {friendly[type] ?? type}
+                        {formatDealType(type)}
                       </span>
                     </div>
                     <div className="flex-1 flex items-center gap-2">

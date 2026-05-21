@@ -9,9 +9,10 @@
 
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+import { resolveDatabaseUrl } from "@/lib/databaseUrl";
 import * as schema from "./schema";
 
-const dbUrl = process.env.DATABASE_URL ?? "file:./data/greenroom.db";
+const dbUrl = resolveDatabaseUrl();
 
 export const client = createClient({ url: dbUrl });
 export const db = drizzle(client, { schema });

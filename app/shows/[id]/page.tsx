@@ -25,17 +25,12 @@ import {
   formatShowDateFull,
   relativeShowDate,
 } from "@/lib/format";
+import {
+  formatCompCategory,
+  formatExpenseCategory,
+  formatPercentageOfBasis,
+} from "@/lib/displayLabels";
 import type { Bonus } from "@/db/schema";
-
-const COMP_LABELS: Record<string, string> = {
-  artist_gl: "Artist guest list",
-  label: "Label / management",
-  press: "Press",
-  venue_staff: "Venue staff",
-  sponsor: "Sponsor",
-  promo: "Promo / radio",
-  other: "Other",
-};
 
 export default async function ShowDetailPage({
   params,
@@ -184,7 +179,10 @@ export default async function ShowDetailPage({
                       mono
                       value={
                         deal.percentage != null
-                          ? `${(deal.percentage * 100).toFixed(0)}% ${deal.percentageBasis ? `of ${deal.percentageBasis}` : ""}`
+                          ? formatPercentageOfBasis(
+                              deal.percentage,
+                              deal.percentageBasis,
+                            )
                           : "—"
                       }
                     />
@@ -377,7 +375,7 @@ export default async function ShowDetailPage({
                     {comps.map((c) => (
                       <tr key={c.id}>
                         <td className="py-2.5">
-                          {COMP_LABELS[c.category] ?? c.category}
+                          {formatCompCategory(c.category)}
                           {c.notes && (
                             <span className="text-ink-400 ml-1">· {c.notes}</span>
                           )}
@@ -433,8 +431,8 @@ export default async function ShowDetailPage({
                   <tbody className="divide-y divide-ink-100/60">
                     {expenses.map((e) => (
                       <tr key={e.id}>
-                        <td className="py-2.5 capitalize">
-                          {e.category}
+                        <td className="py-2.5">
+                          {formatExpenseCategory(e.category)}
                           {e.absorbedByVenue && (
                             <PlainBadge variant="amber" className="ml-2">absorbed</PlainBadge>
                           )}

@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     .update(dealTermConfirmations)
     .set({
       confirmedAt: now,
-      termsHash: `${action}-${Date.now()}`,
+      termsHash: `review:${action}-${Date.now()}`,
       flagNote: action === "flag" ? note : null,
     })
     .where(eq(dealTermConfirmations.id, pendingRow[0].id));

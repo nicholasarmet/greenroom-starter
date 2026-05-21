@@ -10,6 +10,7 @@ import {
   agencies,
   deals,
   dealTermConfirmations,
+  users,
   ticketSales,
   comps,
   expenses,
@@ -83,11 +84,20 @@ export async function getShowById(id: string) {
     db.select().from(comps).where(eq(comps.showId, id)),
   ]);
 
-  const confirmations = await db
-    .select()
+  const confirmationRows = await db
+    .select({
+      confirmation: dealTermConfirmations,
+      user: users,
+    })
     .from(dealTermConfirmations)
+    .leftJoin(users, eq(dealTermConfirmations.userId, users.id))
     .where(eq(dealTermConfirmations.showId, id))
     .orderBy(desc(dealTermConfirmations.confirmedAt));
+
+  const confirmations = confirmationRows.map((row) => ({
+    ...row.confirmation,
+    user: row.user,
+  }));
 
   let recoups: Recoup[] = [];
   if (row.settlement?.recoupsJson) {

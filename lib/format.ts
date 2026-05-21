@@ -36,6 +36,24 @@ export function formatShowDateFull(iso: string): string {
   return format(parseISO(iso), "EEE, MMM d, yyyy");
 }
 
+/** "March 14, 2025" — tour manager / external confirmation headers. */
+export function formatShowDateHeader(iso: string): string {
+  return format(parseISO(iso), "MMMM d, yyyy");
+}
+
+/** "May 20, 2026 at 2:15 PM" — confirmation timestamps. */
+export function formatConfirmationDateTime(
+  value: Date | string | number,
+): string {
+  const date =
+    value instanceof Date
+      ? value
+      : typeof value === "number"
+        ? new Date(value)
+        : parseISO(value);
+  return format(date, "MMMM d, yyyy 'at' h:mm a");
+}
+
 /** "May 2026" — month grouping. */
 export function formatShowMonth(iso: string): string {
   return format(parseISO(iso), "MMMM yyyy");

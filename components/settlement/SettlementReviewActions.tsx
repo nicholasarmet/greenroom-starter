@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatShowDateFull } from "@/lib/format";
+import { formatConfirmationDateTime } from "@/lib/format";
 
 export function SettlementReviewActions({
   showId,
@@ -73,7 +73,7 @@ export function SettlementReviewActions({
       completedReview.actionAt instanceof Date
         ? completedReview.actionAt
         : new Date(completedReview.actionAt);
-    const actionDate = formatShowDateFull(actionAt.toISOString());
+    const actionDate = formatConfirmationDateTime(actionAt);
     const statusMessage = completedReview.wasFlagged
       ? `You flagged this settlement on ${actionDate}.`
       : `You confirmed this settlement on ${actionDate}.`;

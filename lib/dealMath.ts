@@ -29,6 +29,11 @@
  */
 
 import type { Deal, Expense, TicketSale, Bonus } from "@/db/schema";
+import { formatMoney } from "@/lib/format";
+import {
+  formatCappedExpensesNote,
+  formatPercentageRate,
+} from "@/lib/displayLabels";
 
 export type SettlementCalculation =
   | {
@@ -149,8 +154,8 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         })),
       ],
       finalFormula: bonusResult.applied.length
-        ? `flat ${deal.guaranteeAmount} + bonuses ${bonusResult.totalApplied} = ${(deal.guaranteeAmount + bonusResult.totalApplied).toFixed(2)}`
-        : `flat guarantee = ${deal.guaranteeAmount}`,
+        ? `Flat guarantee ${formatMoney(deal.guaranteeAmount)} plus bonuses ${formatMoney(bonusResult.totalApplied)} = ${formatMoney(deal.guaranteeAmount + bonusResult.totalApplied)}`
+        : `Flat guarantee = ${formatMoney(deal.guaranteeAmount)}`,
       bonusesApplied: bonusResult.applied,
       bonusesNotTriggered: bonusResult.notTriggered,
     };
@@ -182,7 +187,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       steps: [
         { label: "Gross box office", value: grossBoxOffice },
         {
-          label: `× ${(deal.percentage * 100).toFixed(0)}%`,
+          label: `× ${formatPercentageRate(deal.percentage)}`,
           value: payout,
           note: "Percentage of gross — no expense deductions.",
         },
@@ -193,8 +198,8 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         })),
       ],
       finalFormula: bonusResult.applied.length
-        ? `gross × ${deal.percentage} + bonuses = ${(payout + bonusResult.totalApplied).toFixed(2)}`
-        : `gross × ${deal.percentage} = ${payout.toFixed(2)}`,
+        ? `Gross box office × ${formatPercentageRate(deal.percentage)} plus bonuses = ${formatMoney(payout + bonusResult.totalApplied)}`
+        : `Gross box office × ${formatPercentageRate(deal.percentage)} = ${formatMoney(payout)}`,
       bonusesApplied: bonusResult.applied,
       bonusesNotTriggered: bonusResult.notTriggered,
     };
@@ -236,7 +241,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         {
           label: "Capped expenses",
           value: -cappedExpenses,
-          note: `Expenses capped by deal terms${deal.expenseCap != null ? ` (expense cap ${deal.expenseCap})` : ""}${deal.hospitalityCap != null ? `, hospitality capped at ${deal.hospitalityCap}` : ""}`,
+          note: formatCappedExpensesNote(deal),
         },
         {
           label: "Net after capped expenses",
@@ -245,7 +250,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
           meta: { anchor: "net" },
         },
         {
-          label: `× ${(deal.percentage * 100).toFixed(0)}%`,
+          label: `× ${formatPercentageRate(deal.percentage)}`,
           value: payout,
           note: "Percentage of net after capped expenses.",
         },
@@ -256,8 +261,8 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         })),
       ],
       finalFormula: bonusResult.applied.length
-        ? `net_after_expenses × ${deal.percentage} + bonuses = ${(payout + bonusResult.totalApplied).toFixed(2)}`
-        : `net_after_expenses × ${deal.percentage} = ${payout.toFixed(2)}`,
+        ? `Net after expenses × ${formatPercentageRate(deal.percentage)} plus bonuses = ${formatMoney(payout + bonusResult.totalApplied)}`
+        : `Net after expenses × ${formatPercentageRate(deal.percentage)} = ${formatMoney(payout)}`,
       bonusesApplied: bonusResult.applied,
       bonusesNotTriggered: bonusResult.notTriggered,
     };
@@ -314,7 +319,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         {
           label: "Capped expenses",
           value: -cappedExpenses,
-          note: `Expenses capped by deal terms${deal.expenseCap != null ? ` (expense cap ${deal.expenseCap})` : ""}${deal.hospitalityCap != null ? `, hospitality capped at ${deal.hospitalityCap}` : ""}`,
+          note: formatCappedExpensesNote(deal),
         },
         {
           label: "Net after capped expenses",
@@ -323,7 +328,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
           meta: { anchor: "net" },
         },
         {
-          label: `× ${(deal.percentage * 100).toFixed(0)}%`,
+          label: `× ${formatPercentageRate(deal.percentage)}`,
           value: netPayout,
           note: "Percentage of net after capped expenses.",
           meta: { winner: !winnerIsGuarantee },
@@ -347,8 +352,8 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
         })),
       ],
       finalFormula: bonusResult.applied.length
-        ? `${winnerLabel} + bonuses = ${(winnerValue + bonusResult.totalApplied).toFixed(2)}`
-        : `${winnerLabel} = ${winnerValue.toFixed(2)}`,
+        ? `${winnerLabel} plus bonuses = ${formatMoney(winnerValue + bonusResult.totalApplied)}`
+        : `${winnerLabel} = ${formatMoney(winnerValue)}`,
       bonusesApplied: bonusResult.applied,
       bonusesNotTriggered: bonusResult.notTriggered,
     };

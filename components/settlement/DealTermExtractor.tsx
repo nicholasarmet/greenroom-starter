@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/format";
+import {
+  formatDealType,
+  formatPercentageBasis,
+  formatPercentageRate,
+} from "@/lib/displayLabels";
 import type { Deal } from "@/db/schema";
 import type { ExtractedDealTerms } from "@/lib/dealTerms";
 
@@ -43,7 +49,13 @@ function formatFieldValue(key: FieldKey, value: unknown) {
     return formatMoney(Number(value));
   }
   if (key === "percentage") {
-    return `${Number(value) * 100}%`;
+    return formatPercentageRate(Number(value));
+  }
+  if (key === "dealType") {
+    return formatDealType(String(value));
+  }
+  if (key === "percentageBasis") {
+    return formatPercentageBasis(String(value));
   }
   return String(value);
 }
@@ -85,6 +97,20 @@ function buildReviewLink(showId: string, linkToken: string) {
   )}`;
 }
 
+async function confirmBookerDealTerms(showId: string, terms: ExtractedDealTerms) {
+  const res = await fetch("/api/confirm-booker-deal-terms", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ showId, terms }),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(
+      (json as { error?: string }).error ?? "Unable to confirm deal terms.",
+    );
+  }
+}
+
 export function DealTermExtractor({
   showId,
   deal,
@@ -92,15 +118,17 @@ export function DealTermExtractor({
   showId: string;
   deal: Deal;
 }) {
+  const router = useRouter();
   const [input, setInput] = useState(deal.dealNotesFreetext ?? "");
   const [result, setResult] = useState<ExtractedDealTerms | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [bookerConfirmed, setBookerConfirmed] = useState(false);
   const [confirmationLinkCopied, setConfirmationLinkCopied] = useState(false);
   const [reviewLinkCopied, setReviewLinkCopied] = useState(false);
   // TODO: in production, structured fields are populated from confirmed dealTerms, not used for comparison.
-
-  const canGenerateLink = !!result;
 
   useEffect(() => {
     if (!confirmationLinkCopied) return;
@@ -117,6 +145,7 @@ export function DealTermExtractor({
   const handleExtract = async () => {
     setLoading(true);
     setError(null);
+    setBookerConfirmed(false);
     setConfirmationLinkCopied(false);
     setReviewLinkCopied(false);
 
@@ -132,6 +161,7 @@ export function DealTermExtractor({
       const json = await res.json();
       setResult(json as ExtractedDealTerms);
     } catch (err) {
+      setResult(null);
       setError(
         err instanceof Error ? err.message : "Unable to extract deal terms.",
       );
@@ -140,15 +170,41 @@ export function DealTermExtractor({
     }
   };
 
-  const handleCopyConfirmationLink = async () => {
+  const handleConfirmDealTerms = async () => {
     if (!result) return;
+    setConfirming(true);
+    setError(null);
+
+    try {
+      await confirmBookerDealTerms(showId, result);
+      setBookerConfirmed(true);
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to confirm deal terms.",
+      );
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleCopyConfirmationLink = async () => {
+    if (!result || !bookerConfirmed) return;
+    setGeneratingLink(true);
+    setError(null);
+    setConfirmationLinkCopied(false);
+
     try {
       const linkToken = await issueDealTermLink(showId, "confirmation");
       const link = buildConfirmationLink(showId, result, linkToken);
       await navigator.clipboard.writeText(link);
       setConfirmationLinkCopied(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to generate confirmation link.");
+      setError(
+        err instanceof Error ? err.message : "Unable to generate confirmation link.",
+      );
+    } finally {
+      setGeneratingLink(false);
     }
   };
 
@@ -191,19 +247,6 @@ export function DealTermExtractor({
           <Button variant="brand" onClick={handleExtract} disabled={loading}>
             {loading ? "Extracting…" : "Extract terms"}
           </Button>
-          <Button
-            variant="outline"
-            disabled={!canGenerateLink || loading}
-            onClick={handleCopyConfirmationLink}
-          >
-            Generate confirmation link
-          </Button>
-          {confirmationLinkCopied ? (
-            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-800">
-              <Check className="h-3.5 w-3.5" />
-              Link copied
-            </span>
-          ) : null}
           <Button
             variant="outline"
             disabled={loading}
@@ -306,6 +349,36 @@ export function DealTermExtractor({
               </CardContent>
             </Card>
 
+            <div className="flex flex-wrap items-center gap-3">
+              {!bookerConfirmed ? (
+                <Button
+                  variant="brand"
+                  disabled={confirming}
+                  onClick={handleConfirmDealTerms}
+                >
+                  {confirming ? "Confirming…" : "Confirm deal terms"}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    disabled={generatingLink}
+                    onClick={handleCopyConfirmationLink}
+                  >
+                    {generatingLink ? "Generating…" : "Generate confirmation link"}
+                  </Button>
+                  {confirmationLinkCopied ? (
+                    <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-800">
+                      <Check className="h-3.5 w-3.5" />
+                      Link copied
+                    </span>
+                  ) : null}
+                  <span className="text-[12px] text-ink-500">
+                    Venue terms confirmed. Generate a link for the tour manager.
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         ) : null}
       </CardContent>

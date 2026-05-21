@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney, formatShowDateFull } from "@/lib/format";
+import { formatMoney, formatConfirmationDateTime } from "@/lib/format";
+import {
+  formatDealType,
+  formatPercentageBasis,
+  formatPercentageRate,
+} from "@/lib/displayLabels";
 import type { Deal } from "@/db/schema";
 import type { ExtractedDealTerms } from "@/lib/dealTerms";
 
@@ -31,7 +36,13 @@ function formatFieldValue(key: FieldKey, value: unknown) {
     return formatMoney(Number(value));
   }
   if (key === "percentage") {
-    return `${Number(value) * 100}%`;
+    return formatPercentageRate(Number(value));
+  }
+  if (key === "dealType") {
+    return formatDealType(String(value));
+  }
+  if (key === "percentageBasis") {
+    return formatPercentageBasis(String(value));
   }
   return String(value);
 }
@@ -120,9 +131,34 @@ function formatTermValue(key: keyof ExtractedDealTerms, value: unknown) {
     return formatMoney(Number(value));
   }
   if (key === "percentage") {
-    return `${Number(value) * 100}%`;
+    return formatPercentageRate(Number(value));
+  }
+  if (key === "dealType") {
+    return formatDealType(String(value));
+  }
+  if (key === "percentageBasis") {
+    return formatPercentageBasis(String(value));
   }
   return formatValue(value);
+}
+
+export type ConfirmShowContext = {
+  artistName: string;
+  showDate: string;
+  venueName: string;
+};
+
+function ShowContextHeader({ context }: { context: ConfirmShowContext }) {
+  return (
+    <div className="mb-10">
+      <h1
+        className="font-display text-[40px] font-medium text-ink-900 leading-[1.08] tracking-tight"
+        style={{ letterSpacing: "-0.02em", fontOpticalSizing: "auto" }}
+      >
+        {context.artistName} - {context.showDate} - {context.venueName}
+      </h1>
+    </div>
+  );
 }
 
 function TermsGrid({ terms }: { terms: ExtractedDealTerms }) {
@@ -152,6 +188,7 @@ export function ConfirmDealTermsClient({
   deal,
   existingConfirmation,
   linkValid,
+  showContext,
 }: {
   showId: string;
   linkToken: string;
@@ -161,6 +198,7 @@ export function ConfirmDealTermsClient({
     terms: ExtractedDealTerms | null;
   } | null;
   linkValid: boolean;
+  showContext?: ConfirmShowContext | null;
 }) {
   const searchParams = useSearchParams();
   const [message, setMessage] = useState<string | null>(null);
@@ -187,14 +225,15 @@ export function ConfirmDealTermsClient({
       existingConfirmation.confirmedAt instanceof Date
         ? existingConfirmation.confirmedAt
         : new Date(existingConfirmation.confirmedAt);
-    const confirmedDate = formatShowDateFull(confirmedAt.toISOString());
+    const confirmedDate = formatConfirmationDateTime(confirmedAt);
 
     return (
       <div className="px-12 py-10 max-w-5xl">
+        {showContext ? <ShowContextHeader context={showContext} /> : null}
         <div className="mb-8">
-          <h1 className="font-display text-[36px] font-medium text-ink-900 tracking-tight">
+          <h2 className="font-display text-[28px] font-medium text-ink-900 tracking-tight">
             Confirmed deal terms
-          </h1>
+          </h2>
           <p className="text-[14px] text-ink-500 mt-3 max-w-2xl">
             These deal terms were previously confirmed for this show.
           </p>
@@ -308,6 +347,7 @@ export function ConfirmDealTermsClient({
   if (!linkToken || !linkValid) {
     return (
       <div className="px-12 py-10 max-w-4xl">
+        {showContext ? <ShowContextHeader context={showContext} /> : null}
         <Card>
           <CardContent>
             <div className="text-[13px] text-rose-700">
@@ -323,6 +363,7 @@ export function ConfirmDealTermsClient({
   if (!termsParam) {
     return (
       <div className="px-12 py-10 max-w-4xl">
+        {showContext ? <ShowContextHeader context={showContext} /> : null}
         <Card>
           <CardContent>
             <div className="text-[13px] text-ink-700">
@@ -337,6 +378,7 @@ export function ConfirmDealTermsClient({
   if (!extractedTerms) {
     return (
       <div className="px-12 py-10 max-w-4xl">
+        {showContext ? <ShowContextHeader context={showContext} /> : null}
         <Card>
           <CardContent>
             <div className="text-[13px] text-rose-700">
@@ -350,10 +392,12 @@ export function ConfirmDealTermsClient({
 
   return (
     <div className="px-12 py-10 max-w-5xl">
+      {showContext ? <ShowContextHeader context={showContext} /> : null}
+
       <div className="mb-8">
-        <h1 className="font-display text-[36px] font-medium text-ink-900 tracking-tight">
+        <h2 className="font-display text-[28px] font-medium text-ink-900 tracking-tight">
           Confirm extracted deal terms
-        </h1>
+        </h2>
         <p className="text-[14px] text-ink-500 mt-3 max-w-2xl">
           Review the extracted deal terms and confirm them for this show. This
           page is the prototype replacement for tour manager email confirmation.

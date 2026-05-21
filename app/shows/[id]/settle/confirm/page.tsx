@@ -1,5 +1,6 @@
 import { getShowById, getTourManagerConfirmationByLinkToken, isTourManagerLinkReadOnly } from "@/lib/queries";
 import { ConfirmDealTermsClient } from "@/components/settlement/ConfirmDealTerms";
+import { formatShowDateHeader } from "@/lib/format";
 import type { ExtractedDealTerms } from "@/lib/dealTerms";
 
 export default async function ConfirmDealTermsPage({
@@ -48,6 +49,14 @@ export default async function ConfirmDealTermsPage({
         }
       : null;
 
+  const showContext = showData
+    ? {
+        artistName: showData.artist?.name ?? "Unknown artist",
+        showDate: formatShowDateHeader(showData.show.date),
+        venueName: showData.venue?.name ?? "Unknown venue",
+      }
+    : null;
+
   return (
     <ConfirmDealTermsClient
       showId={showId ?? ""}
@@ -55,6 +64,7 @@ export default async function ConfirmDealTermsPage({
       deal={showData?.deal ?? null}
       existingConfirmation={existingConfirmation}
       linkValid={!!matchedConfirmation}
+      showContext={showContext}
     />
   );
 }

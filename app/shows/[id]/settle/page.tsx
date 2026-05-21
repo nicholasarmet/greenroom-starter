@@ -29,17 +29,11 @@ import {
 } from "@/lib/format";
 import type { Settlement, Recoup } from "@/db/schema";
 import { DealTermExtractor } from "@/components/settlement/DealTermExtractor";
+import { DealTermConfirmationsCard } from "@/components/settlement/DealTermConfirmationsCard";
 import { MathBreakdown } from "@/components/settlement/MathBreakdown";
 import { Logomark } from "@/components/brand/logo";
 
-const RECOUP_LABELS: Record<Recoup["category"], string> = {
-  marketing: "Marketing",
-  hospitality_overage: "Hospitality overage",
-  production_overage: "Production overage",
-  prior_advance: "Prior advance",
-  damages: "Damages",
-  other: "Other",
-};
+import { formatDealType, formatRecoupCategory } from "@/lib/displayLabels";
 
 export default async function SettlePage({
   params,
@@ -136,26 +130,7 @@ export default async function SettlePage({
       )}
 
       <div className="space-y-6 mt-6">
-        {confirmations && confirmations.length > 0 ? (
-          <div className="mb-4">
-            {confirmations.map((c) => {
-              const conflicts = c.conflictsJson ? JSON.parse(c.conflictsJson as string) as string[] : null;
-              const note = c.flagNote ? String(c.flagNote) : null;
-              if (!note && !conflicts) return null;
-              return (
-                <div key={c.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-2">
-                  <div className="text-[13px] font-semibold text-amber-900">Tour manager flagged an issue</div>
-                  {note ? (
-                    <div className="text-[13px] text-ink-700 mt-1">{note}</div>
-                  ) : null}
-                  {conflicts ? (
-                    <div className="text-[13px] text-ink-700 mt-1">Fields: {conflicts.join(", ")}</div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
+        <DealTermConfirmationsCard confirmations={confirmations} />
         {!calc.supported ? (
           <UnsupportedDeal
             dealType={calc.dealType}
@@ -408,14 +383,6 @@ function UnsupportedDeal({
   ticketCount: number;
   expenseRowCount: number;
 }) {
-  const friendly: Record<string, string> = {
-    flat: "flat guarantee",
-    percentage_of_gross: "percentage of gross",
-    percentage_of_net: "percentage of net",
-    vs: "vs deal",
-    door: "door deal",
-  };
-
   return (
     <>
       <Card accent="amber">
@@ -424,7 +391,7 @@ function UnsupportedDeal({
             <FileWarning className="h-5 w-5 text-amber-700" />
           </div>
           <h2 className="font-display text-[22px] font-medium text-ink-900 mb-2" style={{ letterSpacing: "-0.02em" }}>
-            The in-app tool can&apos;t settle a {friendly[dealType] ?? dealType} yet.
+            The in-app tool can&apos;t settle a {formatDealType(dealType).toLowerCase()} yet.
           </h2>
           <p className="text-[13px] text-ink-500 max-w-md mx-auto leading-relaxed">
             Mariana would do this on a Google Sheet at 2am tonight. The inputs
@@ -583,9 +550,7 @@ function SupportedSettlement({
         <CardHeader>
           <div>
             <CardTitle>Settlement worksheet</CardTitle>
-            <CardDescription className="font-mono">
-              {calc.finalFormula}
-            </CardDescription>
+            <CardDescription>{calc.finalFormula}</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="divide-y divide-ink-100/80">
@@ -683,7 +648,7 @@ function RecoupsSection({ recoups }: { recoups: Recoup[] }) {
                 {r.label}
               </div>
               <div className="text-[11.5px] text-ink-400 mt-0.5">
-                {RECOUP_LABELS[r.category]}
+                {formatRecoupCategory(r.category)}
               </div>
             </div>
             <div>

@@ -5,7 +5,7 @@ import {
   isTourManagerLinkReadOnly,
 } from "@/lib/queries";
 import { calculateSettlement } from "@/lib/dealMath";
-import { formatShowDateFull } from "@/lib/format";
+import { formatConfirmationDateTime, formatShowDateFull } from "@/lib/format";
 import { StatusBadge, DealTypeBadge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettlementReviewActions } from "@/components/settlement/SettlementReviewActions";
@@ -142,7 +142,7 @@ export default async function ReviewSettlementPage({
             <CardContent>
               <div className="text-[13px] text-ink-700">
                 Review link issued at:{" "}
-                {formatShowDateFull(matchedConfirmation.createdAt.toISOString())}.
+                {formatConfirmationDateTime(matchedConfirmation.createdAt)}.
               </div>
             </CardContent>
           </Card>

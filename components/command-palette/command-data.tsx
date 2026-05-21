@@ -1,18 +1,11 @@
 import { getAllShows, getAllArtists } from "@/lib/queries";
 import { formatShowDate, formatMoneyCompact } from "@/lib/format";
+import { formatDealType } from "@/lib/displayLabels";
 import {
   CommandPalette,
   type ShowEntry,
   type ArtistEntry,
 } from "./command-palette";
-
-const dealLabels: Record<string, string> = {
-  flat: "Flat",
-  percentage_of_gross: "% of gross",
-  percentage_of_net: "% of net",
-  vs: "Vs deal",
-  door: "Door deal",
-};
 
 /**
  * Server component that fetches a lightweight search index of all shows
@@ -29,7 +22,7 @@ export async function CommandPaletteData() {
     id: show.id,
     artistName: artist?.name ?? "Unknown Artist",
     dateFormatted: formatShowDate(show.date),
-    dealType: deal ? (dealLabels[deal.dealType] ?? deal.dealType) : null,
+    dealType: deal ? formatDealType(deal.dealType) : null,
     guaranteeFormatted:
       deal?.guaranteeAmount != null
         ? formatMoneyCompact(deal.guaranteeAmount)
