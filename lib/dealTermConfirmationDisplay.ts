@@ -27,25 +27,22 @@ export function isCompletedConfirmation(confirmation: ConfirmationLike): boolean
   return !isPendingDealTermLink(confirmation.termsHash);
 }
 
-/** Short action line shown under the person name (name is shown separately). */
+/** Action label for audit history entries. */
 export function getConfirmationActionLabel(
   confirmation: ConfirmationLike,
 ): string {
+  const isReview = isSettlementReviewConfirmation(confirmation);
   const flagged = isFlaggedConfirmation(confirmation);
 
-  if (isSettlementReviewConfirmation(confirmation)) {
-    return flagged ? "Flagged settlement review" : "Confirmed settlement review";
+  if (flagged) {
+    return isReview ? "Flagged settlement review" : "Flagged deal terms";
   }
 
-  if (confirmation.role === "tour_manager") {
-    return flagged ? "Flagged deal terms" : "Confirmed deal terms";
+  if (isReview) {
+    return "Confirmed settlement review";
   }
 
-  if (confirmation.role === "gm") {
-    return flagged ? "Flagged deal terms" : "Confirmed deal terms";
-  }
-
-  return flagged ? "Flagged deal terms" : "Confirmed deal terms";
+  return "Confirmed deal terms";
 }
 
 /** Full sentence for tour manager entries without a linked user. */

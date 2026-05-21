@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   Briefcase,
   CheckCircle2,
-  Clock,
   UserRound,
 } from "lucide-react";
 import {
@@ -11,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PlainBadge } from "@/components/ui/badge";
 import { formatConfirmationDateTime } from "@/lib/format";
 import {
   getConfirmationActionLabel,
@@ -24,6 +24,40 @@ import type { User, dealTermConfirmations } from "@/db/schema";
 type ConfirmationWithUser = typeof dealTermConfirmations.$inferSelect & {
   user: User | null;
 };
+
+type ConfirmationSide = "venue" | "artist_team";
+
+function sortOldestFirst(rows: ConfirmationWithUser[]) {
+  return [...rows].sort(
+    (a, b) =>
+      new Date(a.confirmedAt).getTime() - new Date(b.confirmedAt).getTime(),
+  );
+}
+
+function getConfirmationSide(
+  confirmation: ConfirmationWithUser,
+): ConfirmationSide {
+  return confirmation.role === "tour_manager" ? "artist_team" : "venue";
+}
+
+function SideBadge({ side }: { side: ConfirmationSide }) {
+  if (side === "venue") {
+    return <PlainBadge variant="default">Venue</PlainBadge>;
+  }
+  return <PlainBadge variant="sky">Artist team</PlainBadge>;
+}
+
+function ActionBadge({
+  label,
+  flagged,
+}: {
+  label: string;
+  flagged: boolean;
+}) {
+  return (
+    <PlainBadge variant={flagged ? "rose" : "brand"}>{label}</PlainBadge>
+  );
+}
 
 function RoleIcon({ role }: { role: ConfirmationWithUser["role"] }) {
   if (role === "tour_manager") {
@@ -66,6 +100,7 @@ function ConfirmationEntry({ confirmation }: { confirmation: ConfirmationWithUse
   const flagged = isFlaggedConfirmation(confirmation);
   const actionLabel = getConfirmationActionLabel(confirmation);
   const name = getDisplayName(confirmation);
+  const side = getConfirmationSide(confirmation);
   const timestamp = formatConfirmationDateTime(confirmation.confirmedAt);
 
   const ariaLabel =
@@ -95,10 +130,13 @@ function ConfirmationEntry({ confirmation }: { confirmation: ConfirmationWithUse
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-[14px] font-semibold text-ink-900 leading-snug">
-                {name}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[14px] font-semibold text-ink-900 leading-snug">
+                  {name}
+                </span>
+                <SideBadge side={side} />
+                <ActionBadge label={actionLabel} flagged={flagged} />
               </div>
-              <div className="text-[12px] text-ink-500 mt-0.5">{actionLabel}</div>
             </div>
             <StatusIndicator flagged={flagged} />
           </div>
@@ -116,64 +154,12 @@ function ConfirmationEntry({ confirmation }: { confirmation: ConfirmationWithUse
   );
 }
 
-function PendingPlaceholder({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-ink-200/90 bg-ink-50/40 px-4 py-8 text-center">
-      <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-white ring-1 ring-ink-200/80">
-        <Clock className="h-4 w-4 text-ink-300" aria-hidden />
-      </div>
-      <div className="text-[12px] font-medium text-ink-500">Pending</div>
-      <p className="mt-1 text-[11px] text-ink-400 leading-relaxed">{label}</p>
-    </div>
-  );
-}
-
-function ConfirmationSection({
-  title,
-  description,
-  rows,
-  pendingLabel,
-}: {
-  title: string;
-  description: string;
-  rows: ConfirmationWithUser[];
-  pendingLabel: string;
-}) {
-  return (
-    <section>
-      <div className="mb-3 pb-3 border-b border-ink-200/60">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-          {title}
-        </h3>
-        <p className="text-[12px] text-ink-400 mt-1">{description}</p>
-      </div>
-      {rows.length > 0 ? (
-        <ul className="space-y-2.5">
-          {rows.map((confirmation) => (
-            <ConfirmationEntry
-              key={confirmation.id}
-              confirmation={confirmation}
-            />
-          ))}
-        </ul>
-      ) : (
-        <PendingPlaceholder label={pendingLabel} />
-      )}
-    </section>
-  );
-}
-
 export function DealTermConfirmationsCard({
   confirmations,
 }: {
   confirmations: ConfirmationWithUser[];
 }) {
-  const completed = confirmations.filter(isCompletedConfirmation);
-
-  const venue = completed.filter(
-    (c) => c.role === "booker" || c.role === "gm",
-  );
-  const artistTeam = completed.filter((c) => c.role === "tour_manager");
+  const entries = sortOldestFirst(confirmations.filter(isCompletedConfirmation));
 
   return (
     <Card>
@@ -186,19 +172,19 @@ export function DealTermConfirmationsCard({
           is finalized.
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 pb-5 space-y-8">
-        <ConfirmationSection
-          title="Venue"
-          description="Booker and GM deal term sign-offs"
-          rows={venue}
-          pendingLabel="Waiting for venue confirmation of extracted deal terms."
-        />
-        <ConfirmationSection
-          title="Artist team"
-          description="Tour manager deal terms and settlement review"
-          rows={artistTeam}
-          pendingLabel="Waiting for tour manager deal term or settlement review confirmation."
-        />
+      <CardContent className="pt-0 pb-5">
+        {entries.length > 0 ? (
+          <ul className="space-y-2.5">
+            {entries.map((confirmation) => (
+              <ConfirmationEntry
+                key={confirmation.id}
+                confirmation={confirmation}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-ink-400">No confirmations yet.</p>
+        )}
       </CardContent>
     </Card>
   );
