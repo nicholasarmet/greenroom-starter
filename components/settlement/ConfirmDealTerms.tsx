@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatShowDateFull } from "@/lib/format";
 import type { Deal } from "@/db/schema";
 import type { ExtractedDealTerms } from "@/lib/dealTerms";
 
@@ -125,12 +125,38 @@ function formatTermValue(key: keyof ExtractedDealTerms, value: unknown) {
   return formatValue(value);
 }
 
+function TermsGrid({ terms }: { terms: ExtractedDealTerms }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {(Object.keys(terms) as (keyof ExtractedDealTerms)[]).map((key) => (
+        <div key={key} className="rounded-2xl border border-ink-200/80 bg-canvas p-4">
+          <div className="text-[12px] text-ink-500">{formatTermLabel(key)}</div>
+          <div className="mt-2 text-[14px] text-ink-900">
+            {key === "bonuses" ? (
+              renderBonusRows(terms.bonuses)
+            ) : key === "recoups" ? (
+              renderRecoupRows(terms.recoups)
+            ) : (
+              <div className="whitespace-pre-wrap">{formatTermValue(key, terms[key])}</div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ConfirmDealTermsClient({
   showId,
   deal,
+  existingConfirmation,
 }: {
   showId: string;
   deal?: Deal | null;
+  existingConfirmation?: {
+    confirmedAt: Date | string;
+    terms: ExtractedDealTerms | null;
+  } | null;
 }) {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -228,6 +254,52 @@ export function ConfirmDealTermsClient({
     }
   };
 
+  if (existingConfirmation) {
+    const confirmedAt =
+      existingConfirmation.confirmedAt instanceof Date
+        ? existingConfirmation.confirmedAt
+        : new Date(existingConfirmation.confirmedAt);
+    const confirmedDate = formatShowDateFull(confirmedAt.toISOString());
+
+    return (
+      <div className="px-12 py-10 max-w-5xl">
+        <div className="mb-8">
+          <h1 className="font-display text-[36px] font-medium text-ink-900 tracking-tight">
+            Confirmed deal terms
+          </h1>
+          <p className="text-[14px] text-ink-500 mt-3 max-w-2xl">
+            These deal terms were previously confirmed for this show.
+          </p>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 text-[13px] text-brand-900">
+          These terms were confirmed on {confirmedDate}. If terms have changed,
+          the venue will send you a new confirmation link.
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Confirmed deal terms</CardTitle>
+              <CardDescription>
+                Confirmed on {confirmedDate}. This record is read-only.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {existingConfirmation.terms ? (
+              <TermsGrid terms={existingConfirmation.terms} />
+            ) : (
+              <div className="text-[13px] text-ink-500">
+                Confirmed terms snapshot is not available for this show.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!termsParam) {
     return (
       <div className="px-12 py-10 max-w-4xl">
@@ -281,22 +353,7 @@ export function ConfirmDealTermsClient({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            {(Object.keys(extractedTerms) as (keyof ExtractedDealTerms)[]).map((key) => (
-              <div key={key} className="rounded-2xl border border-ink-200/80 bg-canvas p-4">
-                <div className="text-[12px] text-ink-500">{formatTermLabel(key)}</div>
-                <div className="mt-2 text-[14px] text-ink-900">
-                  {key === "bonuses" ? (
-                    renderBonusRows(extractedTerms.bonuses)
-                  ) : key === "recoups" ? (
-                    renderRecoupRows(extractedTerms.recoups)
-                  ) : (
-                    <div className="whitespace-pre-wrap">{formatTermValue(key, extractedTerms[key])}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <TermsGrid terms={extractedTerms} />
 
           {message ? (
             <div className="rounded-2xl border border-ink-200 bg-white p-4 text-[13px] text-ink-700">

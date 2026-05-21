@@ -17,7 +17,7 @@ import {
   venues,
   type Recoup,
 } from "@/db/schema";
-import { desc, asc, eq, sql, lte } from "drizzle-orm";
+import { and, desc, asc, eq, sql, lte } from "drizzle-orm";
 
 function todayDateString(): string {
   const d = new Date();
@@ -111,6 +111,24 @@ export async function getShowById(id: string) {
 export type ShowWithRelations = NonNullable<
   Awaited<ReturnType<typeof getShowById>>
 >;
+
+export async function getTourManagerDealConfirmation(showId: string) {
+  if (!showId) return null;
+
+  const rows = await db
+    .select()
+    .from(dealTermConfirmations)
+    .where(
+      and(
+        eq(dealTermConfirmations.showId, showId),
+        eq(dealTermConfirmations.role, "tour_manager"),
+      ),
+    )
+    .orderBy(desc(dealTermConfirmations.confirmedAt))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
 
 /** All artists with show counts. */
 export async function getAllArtists() {

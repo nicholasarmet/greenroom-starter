@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
-import { getShowById } from "@/lib/queries";
+import { getShowById, getTourManagerDealConfirmation } from "@/lib/queries";
 import { ConfirmDealTermsClient } from "@/components/settlement/ConfirmDealTerms";
+import type { ExtractedDealTerms } from "@/lib/dealTerms";
 
 export default async function ConfirmDealTermsPage({
   params,
@@ -18,9 +19,35 @@ export default async function ConfirmDealTermsPage({
     showData = await getShowById(showId);
   }
 
+  const tourManagerConfirmation = showId
+    ? await getTourManagerDealConfirmation(showId)
+    : null;
+
+  let confirmedTerms: ExtractedDealTerms | null = null;
+  if (showData?.deal?.dealTerms) {
+    try {
+      confirmedTerms = JSON.parse(showData.deal.dealTerms) as ExtractedDealTerms;
+    } catch {
+      confirmedTerms = null;
+    }
+  }
+
+  const existingConfirmation = tourManagerConfirmation
+    ? {
+        confirmedAt: tourManagerConfirmation.confirmedAt,
+        terms: confirmedTerms,
+      }
+    : null;
+
   // If no show data is available, render the client component without a
   // `deal` so the page still displays the extracted terms and allows
   // confirmation (previous behavior was client-only and did not require a
   // resolved show record).
-  return <ConfirmDealTermsClient showId={showId ?? ""} deal={showData?.deal ?? null} />;
+  return (
+    <ConfirmDealTermsClient
+      showId={showId ?? ""}
+      deal={showData?.deal ?? null}
+      existingConfirmation={existingConfirmation}
+    />
+  );
 }
