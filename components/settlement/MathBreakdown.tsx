@@ -3,6 +3,115 @@ import { formatMoney } from "@/lib/format";
 import type { Expense, Recoup } from "@/db/schema";
 import type { SettlementCalculation } from "@/lib/dealMath";
 
+type SettlementStep = {
+  label: string;
+  value: number;
+  note?: string;
+  meta?: Record<string, unknown>;
+};
+
+type MathBreakdownAnchors = {
+  gross?: number;
+  net?: number;
+  expenses?: number;
+};
+
+function renderSettlementSteps(
+  steps: SettlementStep[],
+  anchors?: MathBreakdownAnchors,
+  options?: { showFinalFormula?: string },
+) {
+  const visibleSteps =
+    anchors?.gross != null
+      ? steps.filter((step) => step.label !== "Gross box office")
+      : steps;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-[1fr_140px_140px] gap-3">
+        <div className="text-[12px] text-ink-500">Step</div>
+        <div className="text-[12px] text-ink-500 text-right">Step value</div>
+        <div className="text-[12px] text-ink-500 text-right">Running total</div>
+      </div>
+
+      {(() => {
+        let running = 0;
+        return (
+          <div className="space-y-3">
+            {visibleSteps.map((step, index) => {
+              const meta = step.meta as Record<string, unknown> | undefined;
+              const isWinner = meta?.winner === true;
+              const isVsChoice = meta?.type === "vs-choice";
+              const isVsBranch = meta != null && typeof meta.winner === "boolean";
+              const anchorKey = meta?.anchor as keyof MathBreakdownAnchors | undefined;
+
+              if (anchorKey && anchors?.[anchorKey] != null) {
+                running = anchors[anchorKey]!;
+              } else if (isVsChoice) {
+                running = step.value;
+              } else if (isVsBranch) {
+                if (isWinner) {
+                  running = step.value;
+                }
+              } else {
+                running += step.value;
+              }
+
+              return (
+                <div
+                  key={index}
+                  className={`rounded-2xl border p-4 ${
+                    isWinner
+                      ? "border border-ink-200/80 border-l-4 border-l-brand-700 bg-brand-50"
+                      : "border-ink-200/80 bg-slate-50"
+                  }`}
+                >
+                  <div className="grid grid-cols-[1fr_140px_140px] items-start gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-[13px] font-semibold text-ink-900">{step.label}</div>
+                        {isWinner ? (
+                          <div className="text-[11px] font-medium text-brand-900 bg-brand-100/60 rounded-md px-2 py-0.5">
+                            Winner
+                          </div>
+                        ) : null}
+                        {isVsChoice ? (
+                          <div className="text-[11px] font-medium text-ink-700 bg-ink-100 rounded-md px-2 py-0.5">
+                            vs choice
+                          </div>
+                        ) : null}
+                      </div>
+                      {step.note ? (
+                        <div className="text-[12px] text-ink-500 mt-1">{step.note}</div>
+                      ) : null}
+                    </div>
+
+                    <div className="text-[14px] font-medium text-ink-900 text-right">
+                      {step.value >= 0 ? "+" : ""}
+                      {formatMoney(step.value)}
+                    </div>
+
+                    <div className="text-[13px] font-medium text-ink-700 text-right">
+                      {formatMoney(running)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {options?.showFinalFormula ? (
+              <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                <div className="text-[13px] font-semibold text-brand-900">Final formula</div>
+                <div className="text-[14px] text-ink-900 mt-2">{options.showFinalFormula}</div>
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 function getRecoupSnippet(recoup: Recoup, dealText?: string | null) {
   if (!dealText) return "Deal language not available.";
 
@@ -21,17 +130,25 @@ function getRecoupSnippet(recoup: Recoup, dealText?: string | null) {
   return `${start > 0 ? "…" : ""}${snippet}${end < dealText.length ? "…" : ""}`;
 }
 
-export function MathBreakdown({
-  calc,
-  expenses,
-  recoups,
-  dealText,
-}: {
-  calc: SettlementCalculation;
-  expenses: Expense[];
-  recoups: Recoup[];
-  dealText?: string | null;
-}) {
+export function MathBreakdown(
+  props:
+    | {
+        steps: SettlementStep[];
+        anchors?: MathBreakdownAnchors;
+      }
+    | {
+        calc: SettlementCalculation;
+        expenses: Expense[];
+        recoups: Recoup[];
+        dealText?: string | null;
+      },
+) {
+  if ("steps" in props) {
+    return renderSettlementSteps(props.steps, props.anchors);
+  }
+
+  const { calc, expenses, recoups, dealText } = props;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -45,70 +162,15 @@ export function MathBreakdown({
         </CardHeader>
         <CardContent className="space-y-4">
           {calc.supported ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-[1fr_140px_140px] gap-3">
-                <div className="text-[12px] text-ink-500">Step</div>
-                <div className="text-[12px] text-ink-500 text-right">Step value</div>
-                <div className="text-[12px] text-ink-500 text-right">Running total</div>
-              </div>
-
-              {(() => {
-                let running = 0;
-                return (
-                  <div className="space-y-3">
-                    {calc.steps.map((step, index) => {
-                      const meta = step.meta as Record<string, unknown> | undefined;
-                      const isWinner = meta && (meta as any).winner === true;
-                      const isVsChoice = meta && (meta as any).type === "vs-choice";
-                      if (isVsChoice) {
-                        running = step.value;
-                      } else {
-                        running += step.value;
-                      }
-
-                      return (
-                        <div
-                          key={index}
-                          className={`rounded-2xl border p-4 ${
-                            isWinner ? "border-brand-200 bg-brand-50" : "border-ink-200/80 bg-slate-50"
-                          }`}
-                        >
-                          <div className="grid grid-cols-[1fr_140px_140px] items-start gap-3">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <div className="text-[13px] font-semibold text-ink-900">{step.label}</div>
-                                {isWinner ? (
-                                  <div className="text-[11px] font-medium text-brand-900 bg-brand-100/60 rounded-md px-2 py-0.5">Winner</div>
-                                ) : null}
-                                {isVsChoice ? (
-                                  <div className="text-[11px] font-medium text-ink-700 bg-ink-100 rounded-md px-2 py-0.5">vs choice</div>
-                                ) : null}
-                              </div>
-                              {step.note ? (
-                                <div className="text-[12px] text-ink-500 mt-1">{step.note}</div>
-                              ) : null}
-                            </div>
-
-                            <div className="text-[14px] font-medium text-ink-900 text-right">
-                              {step.value >= 0 ? "+" : ""}{formatMoney(step.value)}
-                            </div>
-
-                            <div className="text-[13px] font-medium text-ink-700 text-right">
-                              {formatMoney(running)}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                      <div className="text-[13px] font-semibold text-brand-900">Final formula</div>
-                      <div className="text-[14px] text-ink-900 mt-2">{calc.finalFormula}</div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+            renderSettlementSteps(
+              calc.steps,
+              {
+                gross: calc.grossBoxOffice,
+                net: calc.netBoxOffice,
+                expenses: calc.totalExpenses,
+              },
+              { showFinalFormula: calc.finalFormula },
+            )
           ) : (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[13px] text-ink-700">{calc.reason}</div>
           )}

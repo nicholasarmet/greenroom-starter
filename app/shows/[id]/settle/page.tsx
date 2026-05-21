@@ -29,6 +29,7 @@ import {
 } from "@/lib/format";
 import type { Settlement, Recoup } from "@/db/schema";
 import { DealTermExtractor } from "@/components/settlement/DealTermExtractor";
+import { MathBreakdown } from "@/components/settlement/MathBreakdown";
 import { Logomark } from "@/components/brand/logo";
 
 const RECOUP_LABELS: Record<Recoup["category"], string> = {
@@ -597,14 +598,14 @@ function SupportedSettlement({
             value={formatMoney(calc.totalExpenses)}
           />
           <div className="pt-3" />
-          {calc.steps.map((step, i) => (
-            <Row
-              key={i}
-              label={step.label}
-              value={formatMoney(step.value)}
-              note={step.note}
-            />
-          ))}
+          <MathBreakdown
+            steps={calc.steps}
+            anchors={{
+              gross: calc.grossBoxOffice,
+              net: calc.netBoxOffice,
+              expenses: calc.totalExpenses,
+            }}
+          />
           <div className="pt-3" />
           <div className="flex items-baseline justify-between py-3 font-semibold">
             <span className="text-[13px] text-ink-900">Total to artist</span>
