@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,23 +148,23 @@ function TermsGrid({ terms }: { terms: ExtractedDealTerms }) {
 
 export function ConfirmDealTermsClient({
   showId,
+  linkToken,
   deal,
   existingConfirmation,
+  linkValid,
 }: {
   showId: string;
+  linkToken: string;
   deal?: Deal | null;
   existingConfirmation?: {
     confirmedAt: Date | string;
     terms: ExtractedDealTerms | null;
   } | null;
+  linkValid: boolean;
 }) {
   const searchParams = useSearchParams();
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    console.log("[ConfirmDealTermsClient] existingConfirmation", existingConfirmation);
-  }, [existingConfirmation]);
 
   const termsParam = searchParams.get("terms");
   const decodedText = useMemo(() => {
@@ -229,7 +229,7 @@ export function ConfirmDealTermsClient({
   }
 
   const handleConfirm = async () => {
-    if (!showId || !extractedTerms) return;
+    if (!showId || !linkToken || !extractedTerms) return;
     setSubmitting(true);
     setMessage(null);
 
@@ -239,6 +239,7 @@ export function ConfirmDealTermsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           showId,
+          linkToken,
           confirmedTerms: extractedTerms,
           role: "tour_manager",
         }),
@@ -263,7 +264,7 @@ export function ConfirmDealTermsClient({
   };
 
   const handleSomethingLooksWrong = async () => {
-    if (!showId || !extractedTerms) return;
+    if (!showId || !linkToken || !extractedTerms) return;
     const note = window.prompt(
       "Please briefly explain what looks wrong with these extracted deal terms.",
     );
@@ -275,11 +276,12 @@ export function ConfirmDealTermsClient({
     setSubmitting(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/review-settlement`, {
+      const response = await fetch("/api/confirm-deal-terms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           showId,
+          linkToken,
           action: "flag",
           note: note.trim(),
         }),
@@ -302,6 +304,21 @@ export function ConfirmDealTermsClient({
       setSubmitting(false);
     }
   };
+
+  if (!linkToken || !linkValid) {
+    return (
+      <div className="px-12 py-10 max-w-4xl">
+        <Card>
+          <CardContent>
+            <div className="text-[13px] text-rose-700">
+              Confirmation link is invalid or has expired. Ask the venue for a new
+              link.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!termsParam) {
     return (

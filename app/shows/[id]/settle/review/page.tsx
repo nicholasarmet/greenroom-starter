@@ -1,58 +1,57 @@
 import { notFound } from "next/navigation";
-import { getShowById, getTourManagerDealConfirmation } from "@/lib/queries";
+import {
+  getShowById,
+  getTourManagerConfirmationByLinkToken,
+  isTourManagerLinkReadOnly,
+} from "@/lib/queries";
 import { calculateSettlement } from "@/lib/dealMath";
-import { formatMoney, formatShowDateFull } from "@/lib/format";
+import { formatShowDateFull } from "@/lib/format";
 import { StatusBadge, DealTypeBadge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettlementReviewActions } from "@/components/settlement/SettlementReviewActions";
 import { MathBreakdown } from "@/components/settlement/MathBreakdown";
 import { Logomark } from "@/components/brand/logo";
 
-function base64DecodeServer(value: string) {
-  try {
-    return Buffer.from(value, "base64").toString("utf-8");
-  } catch {
-    return null;
-  }
-}
-
-type ReviewToken = {
-  showId: string;
-  createdAt: number;
-};
-
-function parseReviewToken(value: string | undefined): ReviewToken | null {
-  if (!value) return null;
-  const decoded = base64DecodeServer(value);
-  if (!decoded) return null;
-
-  try {
-    const parsed = JSON.parse(decoded) as ReviewToken;
-    if (typeof parsed.showId !== "string") return null;
-    if (typeof parsed.createdAt !== "number") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
 export default async function ReviewSettlementPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ linkToken?: string }>;
 }) {
   const { id } = await params;
-  const { token } = await searchParams;
-  const tokenPayload = parseReviewToken(token);
-  if (!tokenPayload || tokenPayload.showId !== id) {
+  const resolvedSearchParams = await searchParams;
+  const linkToken =
+    typeof resolvedSearchParams.linkToken === "string"
+      ? resolvedSearchParams.linkToken
+      : undefined;
+
+  if (!linkToken) {
     return (
       <div className="px-12 py-10 max-w-4xl">
         <Card>
           <CardContent>
             <div className="text-[13px] text-rose-700">
-              Review link is missing, invalid, or does not match this show.
+              Review link is missing a valid link token. Ask the venue for a new link.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const matchedConfirmation = await getTourManagerConfirmationByLinkToken(
+    id,
+    linkToken,
+  );
+
+  if (!matchedConfirmation) {
+    return (
+      <div className="px-12 py-10 max-w-4xl">
+        <Card>
+          <CardContent>
+            <div className="text-[13px] text-rose-700">
+              Review link is invalid or has expired. Ask the venue for a new link.
             </div>
           </CardContent>
         </Card>
@@ -63,7 +62,8 @@ export default async function ReviewSettlementPage({
   const showData = await getShowById(id);
   if (!showData) notFound();
 
-  const { show, artist, deal, ticketSales, expenses, settlement, recoups, venue } = showData;
+  const { show, artist, deal, ticketSales, expenses, settlement, recoups, venue } =
+    showData;
   if (!deal) {
     return (
       <div className="px-12 py-10 max-w-4xl">
@@ -85,35 +85,12 @@ export default async function ReviewSettlementPage({
     venueCapacity: venue?.capacity ?? undefined,
   });
 
-  const tourManagerConfirmation = await getTourManagerDealConfirmation(id);
-  const settlementStatus = settlement?.status;
-  const isReadOnly =
-    !!tourManagerConfirmation ||
-    settlementStatus === "in_review" ||
-    settlementStatus === "disputed";
-
-  const readOnlyReview = (() => {
-    if (!isReadOnly) return null;
-
-    if (tourManagerConfirmation) {
-      return {
-        wasFlagged: !!tourManagerConfirmation.flagNote,
-        actionAt: tourManagerConfirmation.confirmedAt,
-      };
-    }
-
-    if (settlementStatus === "disputed") {
-      return {
-        wasFlagged: true,
-        actionAt: settlement?.disputedAt ?? new Date(),
-      };
-    }
-
-    return {
-      wasFlagged: false,
-      actionAt: settlement?.reviewStartedAt ?? new Date(),
-    };
-  })();
+  const readOnlyReview = isTourManagerLinkReadOnly(matchedConfirmation)
+    ? {
+        wasFlagged: !!matchedConfirmation.flagNote,
+        actionAt: matchedConfirmation.confirmedAt,
+      }
+    : null;
 
   return (
     <div className="px-12 py-10 max-w-7xl">
@@ -157,14 +134,15 @@ export default async function ReviewSettlementPage({
         <div className="space-y-6">
           <SettlementReviewActions
             showId={id}
-            token={token ?? ""}
+            linkToken={linkToken}
             readOnlyReview={readOnlyReview}
           />
 
           <Card className="border-ink-200/80 bg-slate-50">
             <CardContent>
               <div className="text-[13px] text-ink-700">
-                Review token created at: {new Date(tokenPayload.createdAt).toLocaleString()}.
+                Review link issued at:{" "}
+                {formatShowDateFull(matchedConfirmation.createdAt.toISOString())}.
               </div>
             </CardContent>
           </Card>
@@ -180,7 +158,7 @@ export default async function ReviewSettlementPage({
             </CardHeader>
             <CardContent>
               <div className="text-[13px] text-ink-500">
-                When the tour manager confirms, the settlement status will move to <strong>in_review</strong>. If they flag the settlement, it will move to <strong>disputed</strong>.
+                When the tour manager confirms, the settlement status will move to <strong>signed</strong>. If they flag the settlement, it will move to <strong>disputed</strong>.
               </div>
             </CardContent>
           </Card>

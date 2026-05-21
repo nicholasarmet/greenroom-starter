@@ -291,6 +291,7 @@ export const dealTermConfirmations = sqliteTable("deal_term_confirmations", {
   }).notNull(),
   confirmedAt: integer("confirmed_at", { mode: "timestamp" }).notNull(),
   termsHash: text("terms_hash").notNull(),
+  linkToken: text("link_token"),
   conflictsJson: text("conflicts_json"),
   flagNote: text("flag_note"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

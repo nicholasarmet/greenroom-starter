@@ -52,21 +52,36 @@ function base64Encode(value: string) {
   return window.btoa(unescape(encodeURIComponent(value)));
 }
 
-function buildConfirmationLink(showId: string, terms: ExtractedDealTerms) {
+async function issueDealTermLink(showId: string, kind: "confirmation" | "review") {
+  const res = await fetch("/api/issue-deal-term-link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ showId, kind }),
+  });
+  if (!res.ok) {
+    throw new Error("Unable to issue link.");
+  }
+  const json = (await res.json()) as { linkToken?: string };
+  if (!json.linkToken) {
+    throw new Error("Link token was not returned.");
+  }
+  return json.linkToken;
+}
+
+function buildConfirmationLink(
+  showId: string,
+  terms: ExtractedDealTerms,
+  linkToken: string,
+) {
   const encoded = base64Encode(JSON.stringify(terms));
   return `${window.location.origin}/shows/${showId}/settle/confirm?terms=${encodeURIComponent(
     encoded,
-  )}`;
+  )}&linkToken=${encodeURIComponent(linkToken)}`;
 }
 
-function buildReviewLink(showId: string) {
-  const payload = {
-    showId,
-    createdAt: Date.now(),
-  };
-  const encoded = base64Encode(JSON.stringify(payload));
-  return `${window.location.origin}/shows/${showId}/settle/review?token=${encodeURIComponent(
-    encoded,
+function buildReviewLink(showId: string, linkToken: string) {
+  return `${window.location.origin}/shows/${showId}/settle/review?linkToken=${encodeURIComponent(
+    linkToken,
   )}`;
 }
 
@@ -127,15 +142,25 @@ export function DealTermExtractor({
 
   const handleCopyConfirmationLink = async () => {
     if (!result) return;
-    const link = buildConfirmationLink(showId, result);
-    await navigator.clipboard.writeText(link);
-    setConfirmationLinkCopied(true);
+    try {
+      const linkToken = await issueDealTermLink(showId, "confirmation");
+      const link = buildConfirmationLink(showId, result, linkToken);
+      await navigator.clipboard.writeText(link);
+      setConfirmationLinkCopied(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to generate confirmation link.");
+    }
   };
 
   const handleCopyReviewLink = async () => {
-    const link = buildReviewLink(showId);
-    await navigator.clipboard.writeText(link);
-    setReviewLinkCopied(true);
+    try {
+      const linkToken = await issueDealTermLink(showId, "review");
+      const link = buildReviewLink(showId, linkToken);
+      await navigator.clipboard.writeText(link);
+      setReviewLinkCopied(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to generate review link.");
+    }
   };
 
   return (
@@ -168,7 +193,7 @@ export function DealTermExtractor({
           </Button>
           <Button
             variant="outline"
-            disabled={!canGenerateLink}
+            disabled={!canGenerateLink || loading}
             onClick={handleCopyConfirmationLink}
           >
             Generate confirmation link

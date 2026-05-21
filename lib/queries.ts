@@ -18,6 +18,7 @@ import {
   type Recoup,
 } from "@/db/schema";
 import { and, desc, asc, eq, sql, lte } from "drizzle-orm";
+import { isCompletedDealTermLink } from "@/lib/dealTermLinks";
 
 function todayDateString(): string {
   const d = new Date();
@@ -128,6 +129,33 @@ export async function getTourManagerDealConfirmation(showId: string) {
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function getTourManagerConfirmationByLinkToken(
+  showId: string,
+  linkToken: string,
+) {
+  if (!showId || !linkToken) return null;
+
+  const rows = await db
+    .select()
+    .from(dealTermConfirmations)
+    .where(
+      and(
+        eq(dealTermConfirmations.showId, showId),
+        eq(dealTermConfirmations.role, "tour_manager"),
+        eq(dealTermConfirmations.linkToken, linkToken),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export function isTourManagerLinkReadOnly(
+  confirmation: Awaited<ReturnType<typeof getTourManagerConfirmationByLinkToken>>,
+) {
+  return confirmation != null && isCompletedDealTermLink(confirmation.termsHash);
 }
 
 /** All artists with show counts. */

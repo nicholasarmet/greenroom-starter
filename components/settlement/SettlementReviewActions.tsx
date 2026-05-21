@@ -1,26 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatShowDateFull } from "@/lib/format";
 
 export function SettlementReviewActions({
   showId,
-  token,
+  linkToken,
   readOnlyReview,
 }: {
   showId: string;
-  token: string;
+  linkToken: string;
   readOnlyReview?: {
     wasFlagged: boolean;
     actionAt: Date | string;
   } | null;
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [completedReview, setCompletedReview] = useState(readOnlyReview ?? null);
+
+  useEffect(() => {
+    setCompletedReview(readOnlyReview ?? null);
+  }, [readOnlyReview]);
 
   const handleAction = async (action: "confirm" | "flag") => {
+    let note = "";
+    if (action === "flag") {
+      const entered = window.prompt(
+        "Please briefly explain what looks wrong with this settlement.",
+      );
+      if (!entered || entered.trim().length === 0) {
+        setMessage("A brief note is required to flag this settlement.");
+        return;
+      }
+      note = entered.trim();
+    }
+
     setSubmitting(true);
     setMessage(null);
 
@@ -28,7 +47,7 @@ export function SettlementReviewActions({
       const response = await fetch("/api/review-settlement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ showId, action, token }),
+        body: JSON.stringify({ showId, linkToken, action, note }),
       });
 
       if (!response.ok) {
@@ -36,16 +55,12 @@ export function SettlementReviewActions({
         throw new Error(payload?.error ?? "Unable to save review action.");
       }
 
-      const payload = await response.json();
-      if (action === "flag") {
-        setMessage(
-          "The settlement has been marked disputed and Mariana has been notified.",
-        );
-      } else {
-        setMessage(
-          "Tour manager review confirmed and settlement moved to in_review.",
-        );
-      }
+      const actionAt = new Date();
+      setCompletedReview({
+        wasFlagged: action === "flag",
+        actionAt,
+      });
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unexpected error.");
     } finally {
@@ -53,13 +68,13 @@ export function SettlementReviewActions({
     }
   };
 
-  if (readOnlyReview != null) {
+  if (completedReview != null) {
     const actionAt =
-      readOnlyReview.actionAt instanceof Date
-        ? readOnlyReview.actionAt
-        : new Date(readOnlyReview.actionAt);
+      completedReview.actionAt instanceof Date
+        ? completedReview.actionAt
+        : new Date(completedReview.actionAt);
     const actionDate = formatShowDateFull(actionAt.toISOString());
-    const statusMessage = readOnlyReview.wasFlagged
+    const statusMessage = completedReview.wasFlagged
       ? `You flagged this settlement on ${actionDate}.`
       : `You confirmed this settlement on ${actionDate}.`;
 
@@ -74,6 +89,14 @@ export function SettlementReviewActions({
         <CardContent>
           <div className="rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 text-[13px] text-brand-900">
             {statusMessage}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button variant="brand" disabled>
+              Confirm review
+            </Button>
+            <Button variant="danger" disabled>
+              Flag as disputed
+            </Button>
           </div>
         </CardContent>
       </Card>

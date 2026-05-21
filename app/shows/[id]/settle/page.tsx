@@ -289,8 +289,9 @@ function LifecycleBar({
         return 1;
       case "in_review":
         return 2;
-      case "disputed":
       case "signed":
+        return 4;
+      case "disputed":
       case "revised":
       case "finalized":
         return 3;
