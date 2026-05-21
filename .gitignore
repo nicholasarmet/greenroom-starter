@@ -22,9 +22,6 @@
 
 # misc
 .DS_Store
-data/greenroom.db
-data/greenroom.local.db
-data/*.db-journal
 *.pem
 
 # debug
