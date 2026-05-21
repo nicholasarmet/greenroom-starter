@@ -37,8 +37,9 @@ export type SettlementCalculation =
       netBoxOffice: number;
       totalExpenses: number;
       totalToArtist: number;
-      steps: { label: string; value: number; note?: string }[];
+      steps: { label: string; value: number; note?: string; meta?: Record<string, unknown> }[];
       finalFormula: string;
+      warnings: string[];
       // Bonuses that were applied. Empty array if no bonuses on the deal,
       // or if no bonuses triggered.
       bonusesApplied: { label: string; amount: number; reason: string }[];
@@ -71,6 +72,34 @@ export function parseBonuses(deal: Deal): Bonus[] {
   }
 }
 
+function getDealTermWarnings(deal: Deal) {
+  if (!deal.dealNotesFreetext) return [] as string[];
+  const unsupportedTerms = ["walkout", "pot", "renegotiated", "phone", "call"];
+  const lower = deal.dealNotesFreetext.toLowerCase();
+  const found = unsupportedTerms.filter((term) => lower.includes(term));
+  if (found.length === 0) return [];
+
+  return [
+    "Deal freetext contains terms that may affect this calculation - confirm with extracted deal terms before finalizing.",
+  ];
+}
+
+function calculateCappedExpenses(deal: Deal, expenses: Expense[]) {
+  const passedThrough = expenses.filter((e) => !e.absorbedByVenue);
+  const hospitality = passedThrough
+    .filter((e) => e.category === "hospitality")
+    .reduce((sum, e) => sum + e.amount, 0);
+  const other = passedThrough
+    .filter((e) => e.category !== "hospitality")
+    .reduce((sum, e) => sum + e.amount, 0);
+
+  const cappedHospitality =
+    deal.hospitalityCap != null ? Math.min(hospitality, deal.hospitalityCap) : hospitality;
+  const subtotal = other + cappedHospitality;
+
+  return deal.expenseCap != null ? Math.min(subtotal, deal.expenseCap) : subtotal;
+}
+
 export function calculateSettlement(input: CalcInput): SettlementCalculation {
   const { deal, ticketSales, expenses, venueCapacity, ticketsSold } = input;
 
@@ -83,6 +112,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
 
   const tickets =
     ticketsSold ?? ticketSales.reduce((sum, t) => sum + (t.qty ?? 0), 0);
+  const warnings = getDealTermWarnings(deal);
 
   // ---------- flat guarantee ----------
   if (deal.dealType === "flat") {
@@ -105,6 +135,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       netBoxOffice,
       totalExpenses,
       totalToArtist: deal.guaranteeAmount + bonusResult.totalApplied,
+      warnings,
       steps: [
         {
           label: "Flat guarantee",
@@ -147,6 +178,7 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       netBoxOffice,
       totalExpenses,
       totalToArtist: payout + bonusResult.totalApplied,
+      warnings,
       steps: [
         { label: "Gross box office", value: grossBoxOffice },
         {
@@ -163,6 +195,160 @@ export function calculateSettlement(input: CalcInput): SettlementCalculation {
       finalFormula: bonusResult.applied.length
         ? `gross × ${deal.percentage} + bonuses = ${(payout + bonusResult.totalApplied).toFixed(2)}`
         : `gross × ${deal.percentage} = ${payout.toFixed(2)}`,
+      bonusesApplied: bonusResult.applied,
+      bonusesNotTriggered: bonusResult.notTriggered,
+    };
+  }
+
+  // ---------- percentage of net ----------
+  if (deal.dealType === "percentage_of_net") {
+    if (deal.percentage == null) {
+      return {
+        supported: false,
+        reason: "Percentage-of-net deal is missing a percentage.",
+        dealType: deal.dealType,
+      };
+    }
+
+    const cappedExpenses = calculateCappedExpenses(deal, expenses);
+    const netAfterExpenses = netBoxOffice - cappedExpenses;
+    const payout = netAfterExpenses * deal.percentage;
+    const bonusResult = applyBonuses(parseBonuses(deal), {
+      gross: grossBoxOffice,
+      tickets,
+      capacity: venueCapacity,
+    });
+
+    return {
+      supported: true,
+      grossBoxOffice,
+      netBoxOffice,
+      totalExpenses,
+      totalToArtist: payout + bonusResult.totalApplied,
+      warnings,
+      steps: [
+        { label: "Gross box office", value: grossBoxOffice },
+        {
+          label: "Ticketing fees",
+          value: -totalFees,
+          note: "Fees deducted from gross to calculate net.",
+        },
+        {
+          label: "Capped expenses",
+          value: -cappedExpenses,
+          note: `Expenses capped by deal terms${deal.expenseCap != null ? ` (expense cap ${deal.expenseCap})` : ""}${deal.hospitalityCap != null ? `, hospitality capped at ${deal.hospitalityCap}` : ""}`,
+        },
+        {
+          label: "Net after capped expenses",
+          value: netAfterExpenses,
+          note: "Net box office minus capped expenses.",
+          meta: { anchor: "net" },
+        },
+        {
+          label: `× ${(deal.percentage * 100).toFixed(0)}%`,
+          value: payout,
+          note: "Percentage of net after capped expenses.",
+        },
+        ...bonusResult.applied.map((b) => ({
+          label: b.label,
+          value: b.amount,
+          note: b.reason,
+        })),
+      ],
+      finalFormula: bonusResult.applied.length
+        ? `net_after_expenses × ${deal.percentage} + bonuses = ${(payout + bonusResult.totalApplied).toFixed(2)}`
+        : `net_after_expenses × ${deal.percentage} = ${payout.toFixed(2)}`,
+      bonusesApplied: bonusResult.applied,
+      bonusesNotTriggered: bonusResult.notTriggered,
+    };
+  }
+
+  // ---------- vs ----------
+  if (deal.dealType === "vs") {
+    // NOTE: recoups are intentionally excluded from this calculator.
+    // The Coastal Spell mismatch is a product finding: the $12,285 final
+    // amount reflects the post-concession disputed recoup resolution,
+    // not the clean net-vs guarantee calculation.
+    if (deal.guaranteeAmount == null) {
+      return {
+        supported: false,
+        reason: "Vs deal is missing a guarantee amount.",
+        dealType: deal.dealType,
+      };
+    }
+    if (deal.percentage == null) {
+      return {
+        supported: false,
+        reason: "Vs deal is missing a percentage.",
+        dealType: deal.dealType,
+      };
+    }
+
+    const cappedExpenses = calculateCappedExpenses(deal, expenses);
+    const netAfterExpenses = netBoxOffice - cappedExpenses;
+    const netPayout = netAfterExpenses * deal.percentage;
+    const guarantee = deal.guaranteeAmount;
+    const winnerIsGuarantee = guarantee >= netPayout;
+    const winnerLabel = winnerIsGuarantee ? "Guarantee" : `${(deal.percentage * 100).toFixed(0)}% of net`;
+    const winnerValue = winnerIsGuarantee ? guarantee : netPayout;
+    const bonusResult = applyBonuses(parseBonuses(deal), {
+      gross: grossBoxOffice,
+      tickets,
+      capacity: venueCapacity,
+    });
+
+    return {
+      supported: true,
+      grossBoxOffice,
+      netBoxOffice,
+      totalExpenses,
+      totalToArtist: winnerValue + bonusResult.totalApplied,
+      warnings,
+      steps: [
+        { label: "Gross box office", value: grossBoxOffice },
+        {
+          label: "Ticketing fees",
+          value: -totalFees,
+          note: "Fees deducted from gross to calculate net.",
+        },
+        {
+          label: "Capped expenses",
+          value: -cappedExpenses,
+          note: `Expenses capped by deal terms${deal.expenseCap != null ? ` (expense cap ${deal.expenseCap})` : ""}${deal.hospitalityCap != null ? `, hospitality capped at ${deal.hospitalityCap}` : ""}`,
+        },
+        {
+          label: "Net after capped expenses",
+          value: netAfterExpenses,
+          note: "Net box office minus capped expenses.",
+          meta: { anchor: "net" },
+        },
+        {
+          label: `× ${(deal.percentage * 100).toFixed(0)}%`,
+          value: netPayout,
+          note: "Percentage of net after capped expenses.",
+          meta: { winner: !winnerIsGuarantee },
+        },
+        {
+          label: "Guarantee",
+          value: guarantee,
+          note: "Deal floor if net share is lower.",
+          meta: { winner: winnerIsGuarantee },
+        },
+        {
+          label: "Choose greater of guarantee and % of net",
+          value: 0,
+          note: `${winnerLabel} wins`,
+          meta: { type: "vs-choice", winnerIndex: winnerIsGuarantee ? 1 : 0 },
+        },
+        ...bonusResult.applied.map((b) => ({
+          label: b.label,
+          value: b.amount,
+          note: b.reason,
+        })),
+      ],
+      finalFormula: bonusResult.applied.length
+        ? `${winnerLabel} + bonuses = ${(winnerValue + bonusResult.totalApplied).toFixed(2)}`
+        : `${winnerLabel} = ${winnerValue.toFixed(2)}`,
       bonusesApplied: bonusResult.applied,
       bonusesNotTriggered: bonusResult.notTriggered,
     };

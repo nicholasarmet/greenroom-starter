@@ -124,6 +124,7 @@ export const deals = sqliteTable("deals", {
 
   bonusesJson: text("bonuses_json"),
   dealNotesFreetext: text("deal_notes_freetext"),
+  dealTerms: text("deal_terms"),
 
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
@@ -279,6 +280,20 @@ export const settlements = sqliteTable("settlements", {
 
   signoffText: text("signoff_text"),
   notes: text("notes"),
+});
+
+export const dealTermConfirmations = sqliteTable("deal_term_confirmations", {
+  id: text("id").primaryKey(),
+  showId: text("show_id").notNull().references(() => shows.id),
+  userId: text("user_id").references(() => users.id),
+  role: text("role", {
+    enum: ["booker", "tour_manager", "gm"],
+  }).notNull(),
+  confirmedAt: integer("confirmed_at", { mode: "timestamp" }).notNull(),
+  termsHash: text("terms_hash").notNull(),
+  conflictsJson: text("conflicts_json"),
+  flagNote: text("flag_note"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
 // -------- Type exports for convenience --------

@@ -28,6 +28,7 @@ import {
   formatShowDateFull,
 } from "@/lib/format";
 import type { Settlement, Recoup } from "@/db/schema";
+import { DealTermExtractor } from "@/components/settlement/DealTermExtractor";
 import { Logomark } from "@/components/brand/logo";
 
 const RECOUP_LABELS: Record<Recoup["category"], string> = {
@@ -48,7 +49,7 @@ export default async function SettlePage({
   const data = await getShowById(id);
   if (!data) notFound();
 
-  const { show, artist, deal, ticketSales, expenses, settlement, recoups } =
+  const { show, artist, deal, ticketSales, expenses, settlement, recoups, confirmations } =
     data;
 
   if (!deal) {
@@ -107,6 +108,13 @@ export default async function SettlePage({
         </div>
       </div>
 
+      {deal.dealTerms ? (
+        <div className="mb-8 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 text-[13px] text-brand-900">
+          Confirmed deal terms exist for this show. Share the confirmation link again if
+          you need the tour manager to reconfirm.
+        </div>
+      ) : null}
+
       {/* Disputed callout */}
       {isDisputed && disputedRecoupValue > 0 && (
         <div className="mb-8 rounded-lg border border-rose-200/60 bg-rose-50/40 p-5 flex gap-3">
@@ -127,6 +135,26 @@ export default async function SettlePage({
       )}
 
       <div className="space-y-6 mt-6">
+        {confirmations && confirmations.length > 0 ? (
+          <div className="mb-4">
+            {confirmations.map((c) => {
+              const conflicts = c.conflictsJson ? JSON.parse(c.conflictsJson as string) as string[] : null;
+              const note = c.flagNote ? String(c.flagNote) : null;
+              if (!note && !conflicts) return null;
+              return (
+                <div key={c.id} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-2">
+                  <div className="text-[13px] font-semibold text-amber-900">Tour manager flagged an issue</div>
+                  {note ? (
+                    <div className="text-[13px] text-ink-700 mt-1">{note}</div>
+                  ) : null}
+                  {conflicts ? (
+                    <div className="text-[13px] text-ink-700 mt-1">Fields: {conflicts.join(", ")}</div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
         {!calc.supported ? (
           <UnsupportedDeal
             dealType={calc.dealType}
@@ -147,6 +175,8 @@ export default async function SettlePage({
         {settlement && (settlement.signoffText || settlement.notes) && (
           <SignoffSection settlement={settlement} />
         )}
+
+        <DealTermExtractor showId={show.id} deal={deal} />
       </div>
 
       <div className="mt-16 pt-10 border-t border-ink-200/60">
@@ -499,6 +529,21 @@ function SupportedSettlement({
 }) {
   return (
     <>
+      {calc.warnings.length > 0 && (
+        <Card accent="amber">
+          <CardContent>
+            <div className="text-[13px] text-ink-900 font-medium">
+              Warning
+            </div>
+            <div className="text-[12px] text-ink-600 mt-2 space-y-1">
+              {calc.warnings.map((warning, index) => (
+                <p key={index}>{warning}</p>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Hero number */}
       <div className="text-center py-10 mb-2">
         <div className="eyebrow text-[10px] text-ink-400 mb-3">Total to artist</div>

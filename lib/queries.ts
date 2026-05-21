@@ -9,6 +9,7 @@ import {
   agents,
   agencies,
   deals,
+  dealTermConfirmations,
   ticketSales,
   comps,
   expenses,
@@ -43,6 +44,8 @@ export async function getAllShows() {
 }
 
 export async function getShowById(id: string) {
+  if (!id) return null;
+
   const rows = await db
     .select({
       show: shows,
@@ -79,6 +82,12 @@ export async function getShowById(id: string) {
     db.select().from(comps).where(eq(comps.showId, id)),
   ]);
 
+  const confirmations = await db
+    .select()
+    .from(dealTermConfirmations)
+    .where(eq(dealTermConfirmations.showId, id))
+    .orderBy(desc(dealTermConfirmations.confirmedAt));
+
   let recoups: Recoup[] = [];
   if (row.settlement?.recoupsJson) {
     try {
@@ -95,6 +104,7 @@ export async function getShowById(id: string) {
     expenses: showExpenses,
     comps: showComps,
     recoups,
+    confirmations,
   };
 }
 
