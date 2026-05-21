@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/format";
@@ -36,8 +37,6 @@ const comparableFields = [
 
 type FieldKey = (typeof comparableFields)[number]["key"];
 
-type Selection = "existing" | "extracted";
-
 function formatFieldValue(key: FieldKey, value: unknown) {
   if (value == null) return "—";
   if (key === "guaranteeAmount" || key === "expenseCap" || key === "hospitalityCap") {
@@ -53,6 +52,24 @@ function base64Encode(value: string) {
   return window.btoa(unescape(encodeURIComponent(value)));
 }
 
+function buildConfirmationLink(showId: string, terms: ExtractedDealTerms) {
+  const encoded = base64Encode(JSON.stringify(terms));
+  return `${window.location.origin}/shows/${showId}/settle/confirm?terms=${encodeURIComponent(
+    encoded,
+  )}`;
+}
+
+function buildReviewLink(showId: string) {
+  const payload = {
+    showId,
+    createdAt: Date.now(),
+  };
+  const encoded = base64Encode(JSON.stringify(payload));
+  return `${window.location.origin}/shows/${showId}/settle/review?token=${encodeURIComponent(
+    encoded,
+  )}`;
+}
+
 export function DealTermExtractor({
   showId,
   deal,
@@ -64,19 +81,29 @@ export function DealTermExtractor({
   const [result, setResult] = useState<ExtractedDealTerms | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [link, setLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [reviewLink, setReviewLink] = useState<string | null>(null);
-  const [reviewCopied, setReviewCopied] = useState(false);
+  const [confirmationLinkCopied, setConfirmationLinkCopied] = useState(false);
+  const [reviewLinkCopied, setReviewLinkCopied] = useState(false);
   // TODO: in production, structured fields are populated from confirmed dealTerms, not used for comparison.
 
   const canGenerateLink = !!result;
 
+  useEffect(() => {
+    if (!confirmationLinkCopied) return;
+    const timeout = setTimeout(() => setConfirmationLinkCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [confirmationLinkCopied]);
+
+  useEffect(() => {
+    if (!reviewLinkCopied) return;
+    const timeout = setTimeout(() => setReviewLinkCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [reviewLinkCopied]);
+
   const handleExtract = async () => {
     setLoading(true);
     setError(null);
-    setLink(null);
-    setCopied(false);
+    setConfirmationLinkCopied(false);
+    setReviewLinkCopied(false);
 
     try {
       const res = await fetch("/api/extract-deal-terms", {
@@ -98,40 +125,17 @@ export function DealTermExtractor({
     }
   };
 
-  const handleGenerateLink = () => {
-    const toEncode = result;
-    if (!toEncode) return;
-    const encoded = base64Encode(JSON.stringify(toEncode));
-    const nextLink = `${window.location.origin}/shows/${showId}/settle/confirm?terms=${encodeURIComponent(
-      encoded,
-    )}`;
-    setLink(nextLink);
-    setCopied(false);
-  };
-
-  const handleCopy = async () => {
-    if (!link) return;
+  const handleCopyConfirmationLink = async () => {
+    if (!result) return;
+    const link = buildConfirmationLink(showId, result);
     await navigator.clipboard.writeText(link);
-    setCopied(true);
+    setConfirmationLinkCopied(true);
   };
 
-  const handleGenerateReviewLink = () => {
-    const payload = {
-      showId,
-      createdAt: Date.now(),
-    };
-    const encoded = base64Encode(JSON.stringify(payload));
-    const nextReviewLink = `${window.location.origin}/shows/${showId}/settle/review?token=${encodeURIComponent(
-      encoded,
-    )}`;
-    setReviewLink(nextReviewLink);
-    setReviewCopied(false);
-  };
-
-  const handleCopyReview = async () => {
-    if (!reviewLink) return;
-    await navigator.clipboard.writeText(reviewLink);
-    setReviewCopied(true);
+  const handleCopyReviewLink = async () => {
+    const link = buildReviewLink(showId);
+    await navigator.clipboard.writeText(link);
+    setReviewLinkCopied(true);
   };
 
   return (
@@ -158,24 +162,36 @@ export function DealTermExtractor({
           />
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button variant="brand" onClick={handleExtract} disabled={loading}>
             {loading ? "Extracting…" : "Extract terms"}
           </Button>
           <Button
             variant="outline"
             disabled={!canGenerateLink}
-            onClick={handleGenerateLink}
+            onClick={handleCopyConfirmationLink}
           >
             Generate confirmation link
           </Button>
+          {confirmationLinkCopied ? (
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-800">
+              <Check className="h-3.5 w-3.5" />
+              Link copied
+            </span>
+          ) : null}
           <Button
             variant="outline"
             disabled={loading}
-            onClick={handleGenerateReviewLink}
+            onClick={handleCopyReviewLink}
           >
             Copy manager review link
           </Button>
+          {reviewLinkCopied ? (
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-800">
+              <Check className="h-3.5 w-3.5" />
+              Link copied
+            </span>
+          ) : null}
         </div>
 
         {error ? (
@@ -266,67 +282,6 @@ export function DealTermExtractor({
             </Card>
 
           </div>
-        ) : null}
-
-        {link ? (
-          <Card className="border-brand-200/80">
-            <CardHeader>
-              <div>
-                <CardTitle>Shareable confirmation link</CardTitle>
-                <CardDescription>
-                  Copy this link and share it with the tour manager. In a production build,
-                  this would be delivered via email.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-2xl border border-ink-200/80 bg-canvas p-4 break-all text-[13px] text-ink-900">
-                {link}
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                <Button variant="brand" onClick={handleCopy}>
-                  {copied ? "Copied" : "Copy link"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (link) window.open(link, "_blank");
-                  }}
-                >
-                  Open link
-                </Button>
-              </div>
-              <div className="text-[12px] text-ink-500">
-                // TODO: replace with email delivery via SendGrid or similar.
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {reviewLink ? (
-          <Card className="border-brand-200/80">
-            <CardHeader>
-              <div>
-                <CardTitle>Tour manager review link</CardTitle>
-                <CardDescription>
-                  Copy this link for the tour manager to review the full settlement math and confirm or flag it.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-2xl border border-ink-200/80 bg-canvas p-4 break-all text-[13px] text-ink-900">
-                {reviewLink}
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                <Button variant="brand" onClick={handleCopyReview}>
-                  {reviewCopied ? "Copied" : "Copy review link"}
-                </Button>
-              </div>
-              <div className="text-[12px] text-ink-500">
-                // TODO: replace with email delivery via SendGrid or similar.
-              </div>
-            </CardContent>
-          </Card>
         ) : null}
       </CardContent>
     </Card>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatShowDateFull } from "@/lib/format";
@@ -158,10 +158,13 @@ export function ConfirmDealTermsClient({
     terms: ExtractedDealTerms | null;
   } | null;
 }) {
-  const params = useParams();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    console.log("[ConfirmDealTermsClient] existingConfirmation", existingConfirmation);
+  }, [existingConfirmation]);
 
   const termsParam = searchParams.get("terms");
   const decodedText = useMemo(() => {
@@ -179,82 +182,7 @@ export function ConfirmDealTermsClient({
   }, [decodedText]);
   // TODO: in production, structured fields are populated from confirmed dealTerms, not used for comparison.
 
-  const handleConfirm = async () => {
-    if (!params?.id || !extractedTerms) return;
-    setSubmitting(true);
-    setMessage(null);
-
-    try {
-      const response = await fetch("/api/confirm-deal-terms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          showId: params.id,
-          confirmedTerms: extractedTerms,
-          role: "tour_manager",
-        }),
-      });
-      if (!response.ok) {
-        let errorMessage = "Unable to confirm deal terms.";
-        try {
-          const data = await response.json();
-          if (data?.error) errorMessage = String(data.error);
-        } catch {
-          const text = await response.text();
-          if (text) errorMessage = text;
-        }
-        throw new Error(errorMessage);
-      }
-      setMessage("Deal terms confirmed and saved.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unknown error.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSomethingLooksWrong = async () => {
-    if (!params?.id || !extractedTerms) return;
-    const note = window.prompt(
-      "Please briefly explain what looks wrong with these extracted deal terms.",
-    );
-    if (!note || note.trim().length === 0) {
-      setMessage("A brief note is required to report an issue.");
-      return;
-    }
-
-    setSubmitting(true);
-    setMessage(null);
-    try {
-      const response = await fetch(`/api/review-settlement`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          showId: params.id,
-          action: "flag",
-          note: note.trim(),
-        }),
-      });
-      if (!response.ok) {
-        let errorText = "Unable to report an issue.";
-        try {
-          const data = await response.json();
-          if (data?.error) errorText = String(data.error);
-        } catch {
-          const text = await response.text();
-          if (text) errorText = text;
-        }
-        throw new Error(errorText);
-      }
-      setMessage("Issue reported. This settlement has been marked disputed.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Unknown error while reporting issue.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (existingConfirmation) {
+  if (existingConfirmation != null) {
     const confirmedAt =
       existingConfirmation.confirmedAt instanceof Date
         ? existingConfirmation.confirmedAt
@@ -299,6 +227,81 @@ export function ConfirmDealTermsClient({
       </div>
     );
   }
+
+  const handleConfirm = async () => {
+    if (!showId || !extractedTerms) return;
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/confirm-deal-terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          showId,
+          confirmedTerms: extractedTerms,
+          role: "tour_manager",
+        }),
+      });
+      if (!response.ok) {
+        let errorMessage = "Unable to confirm deal terms.";
+        try {
+          const data = await response.json();
+          if (data?.error) errorMessage = String(data.error);
+        } catch {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        }
+        throw new Error(errorMessage);
+      }
+      setMessage("Deal terms confirmed and saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unknown error.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSomethingLooksWrong = async () => {
+    if (!showId || !extractedTerms) return;
+    const note = window.prompt(
+      "Please briefly explain what looks wrong with these extracted deal terms.",
+    );
+    if (!note || note.trim().length === 0) {
+      setMessage("A brief note is required to report an issue.");
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/review-settlement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          showId,
+          action: "flag",
+          note: note.trim(),
+        }),
+      });
+      if (!response.ok) {
+        let errorText = "Unable to report an issue.";
+        try {
+          const data = await response.json();
+          if (data?.error) errorText = String(data.error);
+        } catch {
+          const text = await response.text();
+          if (text) errorText = text;
+        }
+        throw new Error(errorText);
+      }
+      setMessage("Issue reported. This settlement has been marked disputed.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Unknown error while reporting issue.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!termsParam) {
     return (

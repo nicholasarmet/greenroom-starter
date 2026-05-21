@@ -9,29 +9,13 @@ export async function POST(request: Request) {
   // TODO: replace with live Anthropic API call to /api/extract-deal-terms.
   const extracted: ExtractedDealTerms = {
     dealType: "vs",
-    guaranteeAmount: 5000,
-    percentage: 0.8,
+    guaranteeAmount: 2500,
+    percentage: 0.85,
     percentageBasis: "net",
-    expenseCap: 2500,
-    hospitalityCap: 500,
-    bonuses: [
-      {
-        type: "gross_threshold",
-        label: "+$1,000 if gross > $25,000",
-        threshold: 25000,
-        amount: 1000,
-        stacks: false,
-      },
-    ],
-    recoups: [
-      {
-        category: "marketing",
-        label: "Marketing recoup",
-        amount: 900,
-        basis: "gross",
-        note: "Marketing recoup of $900 against gross.",
-      },
-    ],
+    expenseCap: 1500,
+    hospitalityCap: 400,
+    bonuses: [],
+    recoups: [],
     rawText,
   };
 

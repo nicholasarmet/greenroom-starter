@@ -3,13 +3,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatShowDateFull } from "@/lib/format";
 
 export function SettlementReviewActions({
   showId,
   token,
+  readOnlyReview,
 }: {
   showId: string;
   token: string;
+  readOnlyReview?: {
+    wasFlagged: boolean;
+    actionAt: Date | string;
+  } | null;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +52,33 @@ export function SettlementReviewActions({
       setSubmitting(false);
     }
   };
+
+  if (readOnlyReview != null) {
+    const actionAt =
+      readOnlyReview.actionAt instanceof Date
+        ? readOnlyReview.actionAt
+        : new Date(readOnlyReview.actionAt);
+    const actionDate = formatShowDateFull(actionAt.toISOString());
+    const statusMessage = readOnlyReview.wasFlagged
+      ? `You flagged this settlement on ${actionDate}.`
+      : `You confirmed this settlement on ${actionDate}.`;
+
+    return (
+      <Card className="border-ink-200/80">
+        <CardHeader>
+          <div>
+            <CardTitle>Tour manager review</CardTitle>
+            <CardDescription>This review is complete and read-only.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 text-[13px] text-brand-900">
+            {statusMessage}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-ink-200/80">

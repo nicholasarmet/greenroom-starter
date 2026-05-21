@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getShowById } from "@/lib/queries";
+import { getShowById, getTourManagerDealConfirmation } from "@/lib/queries";
 import { calculateSettlement } from "@/lib/dealMath";
 import { formatMoney, formatShowDateFull } from "@/lib/format";
 import { StatusBadge, DealTypeBadge } from "@/components/ui/badge";
@@ -85,6 +85,36 @@ export default async function ReviewSettlementPage({
     venueCapacity: venue?.capacity ?? undefined,
   });
 
+  const tourManagerConfirmation = await getTourManagerDealConfirmation(id);
+  const settlementStatus = settlement?.status;
+  const isReadOnly =
+    !!tourManagerConfirmation ||
+    settlementStatus === "in_review" ||
+    settlementStatus === "disputed";
+
+  const readOnlyReview = (() => {
+    if (!isReadOnly) return null;
+
+    if (tourManagerConfirmation) {
+      return {
+        wasFlagged: !!tourManagerConfirmation.flagNote,
+        actionAt: tourManagerConfirmation.confirmedAt,
+      };
+    }
+
+    if (settlementStatus === "disputed") {
+      return {
+        wasFlagged: true,
+        actionAt: settlement?.disputedAt ?? new Date(),
+      };
+    }
+
+    return {
+      wasFlagged: false,
+      actionAt: settlement?.reviewStartedAt ?? new Date(),
+    };
+  })();
+
   return (
     <div className="px-12 py-10 max-w-7xl">
       <div className="mb-14">
@@ -125,7 +155,11 @@ export default async function ReviewSettlementPage({
         </div>
 
         <div className="space-y-6">
-          <SettlementReviewActions showId={id} token={token ?? ""} />
+          <SettlementReviewActions
+            showId={id}
+            token={token ?? ""}
+            readOnlyReview={readOnlyReview}
+          />
 
           <Card className="border-ink-200/80 bg-slate-50">
             <CardContent>
